@@ -1,0 +1,1 @@
+This is a utility to do math operations on streaming data, like mean, min, max, variance, as well as some plotting. The plotting can be done with log scaling of both axes in both directions, either spreading out values near the min, or near the max.
