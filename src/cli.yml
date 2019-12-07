@@ -1,0 +1,72 @@
+name: Streaming Math Processor
+version: "0.1.0"
+author: Dario Gonzalez <goiradio1@gmail.com>
+about: Command line utility for math and stats operations on streamed input
+args:
+  - min:
+      help: print min value
+      long: min
+  - max:
+      help: print max value
+      long: max
+  - count:
+      help: print the number of values processed
+      long: count
+  - mean:
+      help: print the mean of values processed
+      long: mean
+  - sum:
+      help: print the sum of values processed
+      long: sum
+  - standard_deviation:
+      help: print the sample standard deviation
+      aliases: sigma
+      long: standard_deviation
+  - basic:
+      help: prints count, min, mean, max in that order
+      long: basic
+subcommands:
+  - plot:
+      about: plots data visually
+      args:
+        - num-labels:
+            help: the number of count labels
+            long: num-labels
+            default_value: "4"
+        - omit-empty:
+            help: dont print rows (buckets) that are empty
+            long: omit-empty
+        - log-x:
+            help: use a log scale for the x axis
+            long: log-x
+        - log-x-rev:
+            help: use a reverse log scale for the x axis
+            long: log-x-rev
+        - log-y:
+            help: use a log scale for the y (count) axis
+            long: log-y
+        - width:
+            help: the number of columns to use for the graph
+            long: width
+            default_value: "70"
+        - height:
+            help: the number of rows to use for the graph
+            long: height
+            default_value: "40"
+  - filter:
+      about: filters streamed numbers
+      args:
+        - less-than:
+            help: only pass on numbers less than VALUE
+            long: less-than
+            aliases: lt
+            takes_value: true
+            value_name: VALUE
+            allow_hyphen_values: true
+        - greater-than:
+            help: only pass on numbers greater than VALUE
+            long: greater-than
+            aliases: gt
+            takes_value: true
+            value_name: VALUE
+            allow_hyphen_values: true
