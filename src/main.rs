@@ -3,7 +3,7 @@ extern crate clap;
 use std::io;
 use std::io::prelude::*;
 
-use clap::{Arg, App};
+use clap::{Arg, App, SubCommand, ArgMatches};
 
 fn main() {
     let matches = App::new("Streaming Math Processor")
@@ -32,16 +32,36 @@ fn main() {
                     .arg(Arg::with_name("basic")
                             .long("basic")
                             .help("prints the count, min, max, and mean"))
-                    .arg(Arg::with_name("plot")
-                            .long("plot")
-                            .help("plots the data visually"))
-                    .arg(Arg::with_name("plot-log")
-                            .long("plot-log")
-                            .help("plot the data visually with log scale"))
-                    .arg(Arg::with_name("plot-log-rev")
-                            .long("plot-log-rev")
-                            .help("plot the data visually with reverse log scale"))
+                    .subcommand(SubCommand::with_name("plot")
+                                .about("plots the data visually")
+                                .arg(Arg::with_name("log-x")
+                                        .long("log-x")
+                                        .help("use a log scale for the x axis"))
+                                .arg(Arg::with_name("log-x-rev")
+                                        .long("log-x-rev")
+                                        .help("use a reverse log scale for the x axis"))
+                                .arg(Arg::with_name("log-y")
+                                        .long("log-y")
+                                        .help("use log scale for the y (count) axis")))
+                    .subcommand(SubCommand::with_name("filter")
+                                .about("filters streamed numbers")
+                                .arg(Arg::with_name("less-than")
+                                        .long("less-than")
+                                        .visible_alias("lt")
+                                        .takes_value(true)
+                                        .value_name("VALUE")
+                                        .allow_hyphen_values(true)
+                                        .help("only pass on numbers less than VALUE"))
+                                .arg(Arg::with_name("greater-than")
+                                        .long("greater-than")
+                                        .visible_alias("gt")
+                                        .takes_value(true)
+                                        .value_name("VALUE")
+                                        .allow_hyphen_values(true)
+                                        .help("only pass on numbers greater than VALUE")))
                     .get_matches();
+    let plot_matches = matches.subcommand_matches("plot");
+    let filter_matches = matches.subcommand_matches("filter");
 
     let mut min = std::f64::MAX;
     let mut max = std::f64::MIN;
@@ -50,78 +70,120 @@ fn main() {
     let mut ov = OnlineVariance::new();
     let mut vals = Vec::new();
 
-    for line in io::stdin().lock().lines() {
-        let next: f64 = match line.expect("could not read a line from stdin").parse() {
-            Ok(n) => n,
-            Err(e) => {
-                eprintln!("could not parse line: {}", e);
-                continue;
+    if let Some(filter_matches) = filter_matches {
+        let upper_limit = filter_matches.value_of("less-than").map(|raw| raw.parse().expect("could not parse option --less-than"));
+        let lower_limit = filter_matches.value_of("greater-than").map(|raw| raw.parse().expect("could not parse option --greater-than"));
+        for line in io::stdin().lock().lines() {
+            if let Ok(line) = line {
+                let next: f64 = match line.parse() {
+                    Ok(n) => n,
+                    Err(e) => {
+                        eprintln!("could not parse line: {}", e);
+                        continue;
+                    }
+                };
+                if let Some(lower_limit) = lower_limit {
+                    if next < lower_limit {
+                        continue
+                    }
+                }
+                if let Some(upper_limit) = upper_limit {
+                    if next > upper_limit {
+                        continue
+                    }
+                }
+                println!("{}", line);
             }
-        };
-        if matches.is_present("plot") || matches.is_present("plot-log") || matches.is_present("plot-log-rev") {
-            vals.push(next);
         }
-        if matches.is_present("standard_deviation") || matches.is_present("mean") {
-            ov.update(next);
+    } else {
+        for line in io::stdin().lock().lines() {
+            let next: f64 = match line.expect("could not read a line from stdin").parse() {
+                Ok(n) => n,
+                Err(e) => {
+                    eprintln!("could not parse line: {}", e);
+                    continue;
+                }
+            };
+            if plot_matches.is_some() {
+                vals.push(next);
+            }
+            if matches.is_present("standard_deviation") || matches.is_present("mean") {
+                ov.update(next);
+            }
+            // The assumption is these are so cheap it isn't worth it to gate them on flags
+            count += 1;
+            min = min.min(next);
+            max = max.max(next);
+            sum += next;
         }
-        // The assumption is these are so cheap it isn't worth it to gate them on flags
-        count += 1;
-        min = min.min(next);
-        max = max.max(next);
-        sum += next;
+        if matches.is_present("count") || matches.is_present("basic") {
+            println!("count: {}", count);
+        }
+        if matches.is_present("min") || matches.is_present("basic") {
+            println!("min:   {:.3}", min);
+        }
+        if matches.is_present("mean") || matches.is_present("basic") {
+            println!("mean:  {:.3}", ov.mean());
+        }
+        if matches.is_present("max") || matches.is_present("basic") {
+            println!("max:   {:.3}", max);
+        }
+        if matches.is_present("sum") {
+            println!("sum: {}", sum);
+        }
+        if matches.is_present("standard_deviation") {
+            println!("standard deviation: {:.3}", ov.sample_variance().sqrt());
+        }
+        if let Some(plot_matches) = plot_matches {
+            plot(plot_matches, vals, min, max);
+        }
     }
-    if matches.is_present("count") || matches.is_present("basic") {
-        println!("count: {}", count);
-    }
-    if matches.is_present("min") || matches.is_present("basic") {
-        println!("min:   {:.3}", min);
-    }
-    if matches.is_present("mean") || matches.is_present("basic") {
-        println!("mean:  {:.3}", ov.mean());
-    }
-    if matches.is_present("max") || matches.is_present("basic") {
-        println!("max:   {:.3}", max);
-    }
-    if matches.is_present("sum") {
-        println!("sum: {}", sum);
-    }
-    if matches.is_present("standard_deviation") {
-        println!("standard deviation: {:.3}", ov.sample_variance().sqrt());
-    }
-    if matches.is_present("plot") || matches.is_present("plot-log") || matches.is_present("plot-log-rev") {
-        let buckets = if matches.is_present("plot") {
-            bucketize(&vals, 40, min, max)
-        } else if matches.is_present("plot-log") {
-            bucketize_log(&vals, 40, min, max)
-        } else if matches.is_present("plot-log-rev") {
-            bucketize_log_rev(&vals, 40, min, max)
+}
+
+fn plot(plot_matches: &ArgMatches, vals: Vec<f64>, min: f64, max: f64) {
+    let buckets = if plot_matches.is_present("log-x") {
+        bucketize_log(&vals, 40, min, max)
+    } else if plot_matches.is_present("log-x-rev") {
+        bucketize_log_rev(&vals, 40, min, max)
+    } else {
+        bucketize(&vals, 40, min, max)
+    };
+    let bucket_max = *buckets.iter().max().unwrap();
+    let tile_width = if plot_matches.is_present("log-y") {
+        80.0 / (*buckets.iter().max().unwrap() as f64).log(10.0)
+    } else {
+        80.0 / *buckets.iter().max().unwrap() as f64
+    };
+    print!("{:>8}  ", "");
+    for i in 1..5 {
+        if plot_matches.is_present("log-y") {
+            print!("{:>18.3} |", 10.0f64.powf(( bucket_max as f64 ).log10() * i as f64 / 4.0 ));
         } else {
-            unreachable!()
+            print!("{:>18.3} |", bucket_max * i / 4 );
+        }
+    }
+    println!();
+    for (i, bucket) in buckets.iter().enumerate() {
+        if plot_matches.is_present("log-x") {
+            print!("{:>8.2}: ", (max - min + 1.0).powf(i as f64/ 40.0) + min - 1.0);
+        } else if plot_matches.is_present("log-x-rev") {
+            print!("{:>8.2}: ", max + 1.0 - (max - min + 1.0).powf(1.0 - i as f64/ 40.0));
+        } else {
+            print!("{:>8.2}: ", min + ( i as f64 ) * ( max - min ) / 40.0 );
         };
-        let bucket_max = *buckets.iter().max().unwrap();
-        let tile_width = 80.0 / *buckets.iter().max().unwrap() as f64;
-        print!("{:>8}  ", "");
-        for i in 1..5 {
-            print!("{:>18} |", bucket_max * i / 4 );
+        if *bucket > 1 {
+            let tiles = if plot_matches.is_present("log-y") {
+                (tile_width * (*bucket as f64).log10()) as u64
+            } else {
+                (tile_width * *bucket as f64).ceil() as u64
+            };
+            for _ in 0..tiles {
+                print!("#");
+            }
+        } else if *bucket > 0 {
+            print!("X");
         }
         println!();
-        for (i, bucket) in buckets.iter().enumerate() {
-            if matches.is_present("plot") {
-                print!("{:>8.2}: ", min + ( i as f64 ) * ( max - min ) / 40.0 );
-            } else if matches.is_present("plot-log") {
-                print!("{:>8.2}: ", (max - min + 1.0).powf(i as f64/ 40.0) + min - 1.0);
-            } else if matches.is_present("plot-log-rev") {
-                print!("{:>8.2}: ", max + 1.0 - (max - min + 1.0).powf(1.0 - i as f64/ 40.0));
-            } else {
-                unreachable!()
-            };
-            if *bucket > 0 {
-                for _ in 0..(tile_width * *bucket as f64).ceil() as u64 {
-                    print!("#");
-                }
-            }
-            println!();
-        }
     }
 }
 
@@ -129,7 +191,11 @@ fn bucketize(vals: &[f64], num_buckets: usize, min: f64, max: f64) -> Vec<u64> {
     let mut buckets = vec!(0; num_buckets);
     let bucket_size = ( max * 1.000001 - min ) / num_buckets as f64;
     for val in vals {
-        buckets[((val - min)/bucket_size).floor() as usize] += 1;
+        let mut bucket = ((val - min)/bucket_size).floor() as usize;
+        if bucket == num_buckets {
+            bucket -= 1;
+        }
+        buckets[bucket] += 1;
     }
     buckets
 }
@@ -140,8 +206,11 @@ fn bucketize_log(vals: &[f64], num_buckets: usize, min: f64, max: f64) -> Vec<u6
     // The largest possible 9 values is -log10(1 - 1 / count)
     // The bounds of each bucket is min * ( max / min )^( bucket_number / num_buckets )
     for val in vals {
-        let bucket = (val - min + 1.0).log(max - min + 1.0)*0.999999*num_buckets as f64;
-        buckets[bucket.floor() as usize] += 1;
+        let mut bucket = ((val - min + 1.0).log(max - min + 1.0) * num_buckets as f64).trunc() as usize;
+        if bucket == num_buckets {
+            bucket -= 1;
+        }
+        buckets[bucket] += 1;
     }
     buckets
 }
@@ -152,8 +221,11 @@ fn bucketize_log_rev(vals: &[f64], num_buckets: usize, min: f64, max: f64) -> Ve
     // The largest possible 9 values is -log10(1 - 1 / count)
     // The bounds of each bucket is min * ( max / min )^( bucket_number / num_buckets )
     for val in vals {
-        let bucket = (num_buckets as f64) * (1.0 - (max + 1.0 - val).log(max - min + 1.0)) * 0.999999;
-        buckets[bucket.floor() as usize] += 1;
+        let mut bucket = ((num_buckets as f64) * (1.0 - (max + 1.0 - val).log(max - min + 1.0))).trunc() as usize;
+        if bucket == num_buckets {
+            bucket -= 1;
+        }
+        buckets[bucket] += 1;
     }
     buckets
 }
