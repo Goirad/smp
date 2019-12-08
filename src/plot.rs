@@ -26,11 +26,12 @@ pub fn plot(plot_matches: &ArgMatches, vals: Vec<f64>, min: f64, max: f64) {
     };
     let bucket_max = *buckets.iter().max().unwrap();
     let tile_width = if plot_matches.is_present("log-y") {
-        width as f64 / (*buckets.iter().max().unwrap() as f64).log(10.0)
+        width as f64 / (*buckets.iter().max().unwrap() as f64).log10()
     } else {
         width as f64 / *buckets.iter().max().unwrap() as f64
     };
-    print!("{:>8}  ", "");
+    let padding = format!("{:.2}", max).len();
+    print!("{1:>0$}  ", padding, "");
     let width_per_label = width as usize / num_labels as usize - 2;
     for i in 1..=num_labels {
         if plot_matches.is_present("log-y") {
@@ -48,22 +49,24 @@ pub fn plot(plot_matches: &ArgMatches, vals: Vec<f64>, min: f64, max: f64) {
         if !plot_matches.is_present("omit-empty") || *bucket > 0 {
             if plot_matches.is_present("log-x") {
                 print!(
-                    "{:>8.2}: ",
+                    "{1:>0$.2}: ",
+                    padding,
                     (max - min + 1.0).powf(i as f64 / height as f64) + min - 1.0
                 );
             } else if plot_matches.is_present("log-x-rev") {
                 print!(
-                    "{:>8.2}: ",
+                    "{1:>0$.2}: ",
+                    padding,
                     max + 1.0 - (max - min + 1.0).powf(1.0 - i as f64 / height as f64)
                 );
             } else {
-                print!("{:>8.2}: ", min + (i as f64) * (max - min) / height as f64);
+                print!("{1:>0$.2}: ", padding, min + (i as f64) * (max - min) / height as f64);
             }
             if *bucket > 1 {
                 let tiles = if plot_matches.is_present("log-y") {
                     (tile_width * (*bucket as f64).log10()) as u64
                 } else {
-                    (tile_width * *bucket as f64).ceil() as u64
+                    (tile_width * *bucket as f64).round() as u64
                 };
                 for _ in 0..tiles {
                     print!("#");
@@ -74,6 +77,7 @@ pub fn plot(plot_matches: &ArgMatches, vals: Vec<f64>, min: f64, max: f64) {
             println!();
         }
     }
+    println!("{1:>0$.2}", padding, max as usize);
 }
 
 fn bucketize(vals: &[f64], num_buckets: usize, min: f64, max: f64) -> Vec<u64> {

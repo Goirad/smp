@@ -20,12 +20,12 @@ pub fn filter(filter_matches: &ArgMatches) {
                 }
             };
             if let Some(lower_limit) = lower_limit {
-                if next < lower_limit {
+                if next <= lower_limit {
                     continue;
                 }
             }
             if let Some(upper_limit) = upper_limit {
-                if next > upper_limit {
+                if next >= upper_limit {
                     continue;
                 }
             }
