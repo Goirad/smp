@@ -18,10 +18,10 @@ args:
   - sum:
       help: print the sum of values processed
       long: sum
-  - standard_deviation:
+  - standard-deviation:
       help: print the sample standard deviation
       aliases: sigma
-      long: standard_deviation
+      long: standard-deviation
   - basic:
       help: prints count, min, mean, max in that order
       long: basic

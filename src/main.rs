@@ -41,7 +41,7 @@ fn main() {
             if plot_matches.is_some() {
                 vals.push(next);
             }
-            if matches.is_present("standard_deviation")
+            if matches.is_present("standard-deviation")
                 || matches.is_present("mean")
                 || matches.is_present("basic")
             {
@@ -68,7 +68,7 @@ fn main() {
         if matches.is_present("sum") {
             println!("sum: {}", sum);
         }
-        if matches.is_present("standard_deviation") {
+        if matches.is_present("standard-deviation") {
             println!("standard deviation: {:.3}", ov.sample_variance().sqrt());
         }
         if let Some(plot_matches) = plot_matches {
