@@ -31,27 +31,30 @@ fn main() {
         filter(filter_matches);
     } else {
         for line in io::stdin().lock().lines() {
-            let next: f64 = match line.expect("could not read a line from stdin").parse() {
-                Ok(n) => n,
-                Err(e) => {
-                    eprintln!("could not parse line: {}", e);
-                    continue;
+            let line = line.expect("could not read a line from stdin");
+            if !line.is_empty() {
+                let next: f64 = match line.parse() {
+                    Ok(n) => n,
+                    Err(e) => {
+                        eprintln!("could not parse line: {}", e);
+                        continue;
+                    }
+                };
+                if plot_matches.is_some() {
+                    vals.push(next);
                 }
-            };
-            if plot_matches.is_some() {
-                vals.push(next);
+                if matches.is_present("standard-deviation")
+                    || matches.is_present("mean")
+                    || matches.is_present("basic")
+                {
+                    ov.update(next);
+                }
+                // The assumption is these are so cheap it isn't worth it to gate them on flags
+                count += 1;
+                min = min.min(next);
+                max = max.max(next);
+                sum += next;
             }
-            if matches.is_present("standard-deviation")
-                || matches.is_present("mean")
-                || matches.is_present("basic")
-            {
-                ov.update(next);
-            }
-            // The assumption is these are so cheap it isn't worth it to gate them on flags
-            count += 1;
-            min = min.min(next);
-            max = max.max(next);
-            sum += next;
         }
         if matches.is_present("count") || matches.is_present("basic") {
             println!("count: {}", count);
